@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ove Music</title>
+  <!-- Lector de Metadatos de MP3 (Portadas y Artistas reales) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+  <style>
+    :root {
+      --accent: #8b5cf6;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --text: #ffffff;
+      --text-sub: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: linear-gradient(135deg, #0f0715 0%, #030005 50%, #1a0b2e 100%);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+      padding-bottom: 160px;
+      user-select: none;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Fondo Difuminado Dinámico basado en la Portada */
+    #bg-blur {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-size: cover;
+      background-position: center;
+      filter: blur(60px) brightness(0.3);
+      z-index: -1;
+      transition: background-image 0.8s ease-in-out;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-img {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      object-fit: cover;
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, #fff, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .btn-select {
+      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(109, 40, 217, 0.4);
+      transition: transform 0.2s;
+    }
+
+    .btn-select:active { transform: scale(0.95); }
+
+    /* Lista Glassmorphism */
+    .song-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .song-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      padding: 12px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .song-item.active {
+      border-color: var(--accent);
+      background: rgba(139, 92, 246, 0.15);
+    }
+
+    .cover {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      background: #1e1b2e;
+      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .info { flex: 1; overflow: hidden; }
+    .title { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .artist { font-size: 0.8rem; color: var(--text-sub); margin-top: 2px; }
+
+    /* Reproductor Fijo Abajo */
+    .player-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(15, 7, 21, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--glass-border);
+      padding: 15px 20px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .time-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+
+    .seek-bar {
+      flex: 1;
+      height: 4px;
+      accent-color: #c084fc;
+      cursor: pointer;
+    }
+
+    .player-controls-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .controls { display: flex; align-items: center; gap: 18px; }
+    .controls button {
+      background: none; border: none; color: white; font-size: 1.4rem; cursor: pointer;
+    }
+    .btn-main { font-size: 2rem !important; }
+
+    audio { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="bg-blur"></div>
+
+  <header>
+    <div class="logo-container">
+      <img class="logo-img" src="https://i.imgur.com/kkrNGAe.png" alt="Ove Logo">
+      <div class="logo-text">Ove Music</div>
+    </div>
+    <input type="file" id="file-input" webkitdirectory directory multiple accept="audio/*" style="display:none">
+    <button class="btn-select" onclick="document.getElementById('file-input').click()">Cargar Música</button>
+  </header>
+
+  <div class="song-list" id="playlist">
+    <p style="color: var(--text-sub); text-align: center; margin-top: 50px;">Selecciona tu carpeta de música para cargar los MP3.</p>
+  </div>
+
+  <div class="player-bar">
+    <div class="time-container">
+      <span id="current-time">0:00</span>
+      <input type="range" id="seek-bar" class="seek-bar" value="0" min="0" max="100">
+      <span id="duration-time">0:00</span>
+    </div>
+
+    <div class="player-controls-wrapper">
+      <div class="info" style="display: flex; align-items: center; gap: 12px;">
+        <img id="player-cover" class="cover" src="" style="display:none;">
+        <div id="player-cover-placeholder" class="cover">🎵</div>
+        <div>
+          <div class="title" id="current-title">Ove Music</div>
+          <div class="artist" id="current-artist">Sin reproducción</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button onclick="prevSong()">⏮️</button>
+        <button id="btn-play" class="btn-main" onclick="togglePlay()">▶️</button>
+        <button onclick="nextSong()">⏭️</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio-player"></audio>
+
+  <script>
+    const fileInput = document.getElementById('file-input');
+    const playlist = document.getElementById('playlist');
+    const audioPlayer = document.getElementById('audio-player');
+    const currentTitle = document.getElementById('current-title');
+    const currentArtist = document.getElementById('current-artist');
+    const btnPlay = document.getElementById('btn-play');
+    const seekBar = document.getElementById('seek-bar');
+    const currentTimeEl = document.getElementById('current-time');
+    const durationTimeEl = document.getElementById('duration-time');
+    const bgBlur = document.getElementById('bg-blur');
+    const playerCover = document.getElementById('player-cover');
+    const playerCoverPlaceholder = document.getElementById('player-cover-placeholder');
+
+    let songs = [];
+    let currentIndex = -1;
+
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('audio/') || f.name.endsWith('.mp3'));
+      if (files.length === 0) return;
+
+      songs = files;
+      playlist.innerHTML = '';
+
+      songs.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'song-item';
+        item.id = `song-${index}`;
+        const cleanName = file.name.replace(/\.[^/.]+$/, "");
+        
+        item.innerHTML = `
+          <div class="cover" id="thumb-${index}">🎶</div>
+          <div class="info">
+            <div class="title">${cleanName}</div>
+            <div class="artist" id="artist-${index}">Cargando metadatos...</div>
+          </div>
+        `;
+
+        item.onclick = () => playSong(index);
+        playlist.appendChild(item);
+
+        // Extraer portada y artista usando jsmediatags
+        jsmediatags.read(file, {
+          onSuccess: function(tag) {
+            const tags = tag.tags;
+            if (tags.artist) {
+              document.getElementById(`artist-${index}`).innerText = tags.artist;
+            } else {
+              document.getElementById(`artist-${index}`).innerText = "Archivo Local";
+            }
+
+            if (tags.picture) {
+              const { data, format } = tags.picture;
+              let base64String = "";
+              for (let i = 0; i < data.length; i++) {
+                base64String += String.fromCharCode(data[i]);
+              }
+              const imageUrl = `data:${format};base64,${window.btoa(base64String)}`;
+              const thumbEl = document.getElementById(`thumb-${index}`);
+              thumbEl.innerHTML = `<img src="${imageUrl}" style="width:100%;height:100%;border-radius:12px;object-fit:cover;">`;
+              file.customCover = imageUrl;
+              file.customArtist = tags.artist || "Archivo Local";
+            }
+          },
+          onError: function() {
+            document.getElementById(`artist-${index}`).innerText = "Archivo Local";
+          }
+        });
+      });
+    });
+
+    function playSong(index) {
+      if (index < 0 || index >= songs.length) return;
+
+      if (currentIndex !== -1) {
+        const prevItem = document.getElementById(`song-${currentIndex}`);
+        if(prevItem) prevItem.classList.remove('active');
+      }
+
+      currentIndex = index;
+      const file = songs[currentIndex];
+      const objectURL = URL.createObjectURL(file);
+
+      const currentItem = document.getElementById(`song-${currentIndex}`);
+      if(currentItem) currentItem.classList.add('active');
+
+      audioPlayer.src = objectURL;
+      audioPlayer.play();
+
+      const cleanName = file.name.replace(/\.[^/.]+$/, "");
+      const artistName = file.customArtist || "Archivo Local";
+      
+      currentTitle.innerText = cleanName;
+      currentArtist.innerText = artistName;
+      btnPlay.innerText = "⏸️";
+
+      // Actualizar Portada y Fondo Difuminado Dinámico
+      if (file.customCover) {
+        bgBlur.style.backgroundImage = `url('${file.customCover}')`;
+        playerCover.src = file.customCover;
+        playerCover.style.display = "block";
+        playerCoverPlaceholder.style.display = "none";
+      } else {
+        bgBlur.style.backgroundImage = 'none';
+        playerCover.style.display = "none";
+        playerCoverPlaceholder.style.display = "flex";
+      }
+
+      // Notificaciones / Pantalla de Bloqueo
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: cleanName,
+          artist: artistName,
+          album: "Ove Music",
+          artwork: file.customCover ? [{ src: file.customCover, sizes: '512x512', type: 'image/png' }] : []
+        });
+
+        navigator.mediaSession.setActionHandler('play', () => togglePlay());
+        navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+        navigator.mediaSession.setActionHandler('previoustrack', () => prevSong());
+        navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
+      }
+    }
+
+    function togglePlay() {
+      if (!audioPlayer.src) return;
+      if (audioPlayer.paused) {
+        audioPlayer.play();
+        btnPlay.innerText = "⏸️";
+      } else {
+        audioPlayer.pause();
+        btnPlay.innerText = "▶️";
+      }
+    }
+
+    function prevSong() { if (currentIndex > 0) playSong(currentIndex - 1); }
+    function nextSong() { if (currentIndex + 1 < songs.length) playSong(currentIndex + 1); }
+
+    audioPlayer.addEventListener('timeupdate', () => {
+      if (audioPlayer.duration) {
+        const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+        seekBar.value = progress;
+        currentTimeEl.innerText = formatTime(audioPlayer.currentTime);
+        durationTimeEl.innerText = formatTime(audioPlayer.duration);
+      }
+    });
+
+    seekBar.addEventListener('input', () => {
+      if (audioPlayer.duration) {
+        audioPlayer.currentTime = (seekBar.value / 100) * audioPlayer.duration;
+      }
+    });
+
+    audioPlayer.onended = () => nextSong();
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.floor(seconds % 60);
+      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+  </script>
+</body>
+</html>
